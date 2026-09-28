@@ -59,6 +59,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         scrollItem.state = EventTapManager.shared.scrollReversalEnabled ? .on : .off
         menu.addItem(scrollItem)
 
+        // Scroll speed submenu (only shown when reversal is on)
+        if EventTapManager.shared.scrollReversalEnabled {
+            let speedItem = NSMenuItem(title: "  Scroll Speed", action: nil, keyEquivalent: "")
+            let speedMenu = NSMenu()
+            let current = EventTapManager.shared.scrollSpeedMultiplier
+            for (label, value) in [("Slow (1x)", 1.0), ("Normal (2x)", 2.0), ("Fast (3x)", 3.0), ("Very Fast (5x)", 5.0)] {
+                let item = NSMenuItem(title: label, action: #selector(setScrollSpeed(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = value
+                item.state = current == value ? .on : .off
+                speedMenu.addItem(item)
+            }
+            speedItem.submenu = speedMenu
+            menu.addItem(speedItem)
+        }
+
         menu.addItem(NSMenuItem.separator())
 
         let permItem = NSMenuItem(
@@ -85,6 +101,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openSettings() {
         SettingsWindowController.shared.showWindow()
+    }
+
+    @objc private func setScrollSpeed(_ sender: NSMenuItem) {
+        guard let value = sender.representedObject as? Double else { return }
+        EventTapManager.shared.scrollSpeedMultiplier = value
+        updateMenu()
     }
 
     @objc private func toggleScrollReversal() {

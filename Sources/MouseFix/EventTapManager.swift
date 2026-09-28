@@ -11,6 +11,9 @@ class EventTapManager {
     var scrollReversalEnabled: Bool = true {
         didSet { savePreferences() }
     }
+    var scrollSpeedMultiplier: Double = 3.0 {
+        didSet { savePreferences() }
+    }
     var prevButton: Int = 3 {
         didSet { savePreferences() }
     }
@@ -34,6 +37,7 @@ class EventTapManager {
         let d = UserDefaults.standard
         if d.object(forKey: "sideButtonsEnabled") != nil   { sideButtonsEnabled   = d.bool(forKey: "sideButtonsEnabled") }
         if d.object(forKey: "scrollReversalEnabled") != nil { scrollReversalEnabled = d.bool(forKey: "scrollReversalEnabled") }
+        if d.object(forKey: "scrollSpeedMultiplier") != nil  { scrollSpeedMultiplier  = d.double(forKey: "scrollSpeedMultiplier") }
         if d.object(forKey: "prevWorkspaceButton") != nil  { prevButton = d.integer(forKey: "prevWorkspaceButton") }
         if d.object(forKey: "nextWorkspaceButton") != nil  { nextButton = d.integer(forKey: "nextWorkspaceButton") }
     }
@@ -42,6 +46,7 @@ class EventTapManager {
         let d = UserDefaults.standard
         d.set(sideButtonsEnabled,   forKey: "sideButtonsEnabled")
         d.set(scrollReversalEnabled, forKey: "scrollReversalEnabled")
+        d.set(scrollSpeedMultiplier,  forKey: "scrollSpeedMultiplier")
         d.set(prevButton, forKey: "prevWorkspaceButton")
         d.set(nextButton, forKey: "nextWorkspaceButton")
     }
@@ -220,6 +225,7 @@ class EventTapManager {
     // MARK: - Scroll reversal
 
     private func reverseScroll(_ event: CGEvent) -> Unmanaged<CGEvent>? {
+        let m = scrollSpeedMultiplier
         let d1 = event.getIntegerValueField(.scrollWheelEventDeltaAxis1)
         let d2 = event.getIntegerValueField(.scrollWheelEventDeltaAxis2)
         let f1 = event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1)
@@ -227,12 +233,12 @@ class EventTapManager {
         let p1 = event.getDoubleValueField(.scrollWheelEventPointDeltaAxis1)
         let p2 = event.getDoubleValueField(.scrollWheelEventPointDeltaAxis2)
 
-        event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: -d1)
-        event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: -d2)
-        event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: -f1)
-        event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: -f2)
-        event.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: -p1)
-        event.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: -p2)
+        event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: Int64(Double(-d1) * m))
+        event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: Int64(Double(-d2) * m))
+        event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: -f1 * m)
+        event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: -f2 * m)
+        event.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: -p1 * m)
+        event.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: -p2 * m)
 
         return Unmanaged.passRetained(event)
     }
