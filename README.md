@@ -18,14 +18,16 @@ A lightweight macOS menu bar app that maps mouse side buttons to workspace switc
 
 1. Clone the repo and build:
    ```
-   git clone https://github.com/YOUR_USERNAME/MacMouseEnhancer.git
-   cd MacMouseEnhancer/MouseFix
+   git clone https://github.com/lhonardo/MacMouseEnhancer.git
+   cd MacMouseEnhancer
    swift build -c release
    ```
 
-2. Copy the binary into the app bundle:
+2. Create the app bundle and copy the binary:
    ```
+   mkdir -p MacMouseEnhancer.app/Contents/MacOS
    cp .build/arm64-apple-macosx/release/MacMouseEnhancer MacMouseEnhancer.app/Contents/MacOS/MacMouseEnhancer
+   cp Info.plist MacMouseEnhancer.app/Contents/Info.plist
    ```
 
 3. Move `MacMouseEnhancer.app` to `/Applications`
