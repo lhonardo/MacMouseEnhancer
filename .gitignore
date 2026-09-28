@@ -1,0 +1,6 @@
+MouseFix/.build/
+MouseFix/MacMouseEnhancer.app/Contents/MacOS/MacMouseEnhancer
+*.o
+*.d
+*.swp
+.DS_Store
