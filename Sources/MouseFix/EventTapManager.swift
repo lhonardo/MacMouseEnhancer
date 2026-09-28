@@ -14,10 +14,10 @@ class EventTapManager {
     var scrollSpeedMultiplier: Double = 3.0 {
         didSet { savePreferences() }
     }
-    var prevButton: Int = 3 {
+    var prevButton: Int = 4 {
         didSet { savePreferences() }
     }
-    var nextButton: Int = 4 {
+    var nextButton: Int = 3 {
         didSet { savePreferences() }
     }
 
