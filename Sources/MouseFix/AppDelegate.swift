@@ -8,6 +8,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusBar()
         checkAccessibilityPermissions()
+
+        // Keep the menu in sync when scroll reversal is toggled via keyboard shortcut.
+        EventTapManager.shared.scrollReversalDidToggle = { [weak self] in
+            self?.updateMenu()
+        }
     }
 
     private func setupStatusBar() {
@@ -38,14 +43,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         sideBtnItem.state = EventTapManager.shared.sideButtonsEnabled ? .on : .off
         menu.addItem(sideBtnItem)
 
-        let assignItem = NSMenuItem(
-            title: "  Button Assignments…",
-            action: #selector(openSettings),
-            keyEquivalent: ""
-        )
-        assignItem.target = self
-        menu.addItem(assignItem)
-
         // Scroll reversal toggle
         let scrollTitle = EventTapManager.shared.scrollReversalEnabled
             ? "Scroll Reversal: ON"
@@ -74,6 +71,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             speedItem.submenu = speedMenu
             menu.addItem(speedItem)
         }
+
+        // Show the toggle shortcut as a disabled hint under scroll reversal.
+        let shortcutHint = NSMenuItem(
+            title: "  Toggle Shortcut: " + EventTapManager.describeShortcut(
+                keyCode: EventTapManager.shared.scrollReversalShortcutKeyCode,
+                modifiers: EventTapManager.shared.scrollReversalShortcutModifiers
+            ),
+            action: nil,
+            keyEquivalent: ""
+        )
+        shortcutHint.isEnabled = false
+        menu.addItem(shortcutHint)
+
+        menu.addItem(NSMenuItem.separator())
+
+        let assignItem = NSMenuItem(
+            title: "Settings…",
+            action: #selector(openSettings),
+            keyEquivalent: ""
+        )
+        assignItem.target = self
+        menu.addItem(assignItem)
 
         menu.addItem(NSMenuItem.separator())
 

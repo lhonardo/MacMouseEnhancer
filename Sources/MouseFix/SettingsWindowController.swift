@@ -9,18 +9,22 @@ class SettingsWindowController: NSWindowController {
     private var prevAssignBtn: NSButton!
     private var nextAssignBtn: NSButton!
 
+    private var shortcutLabel: NSTextField!
+    private var shortcutAssignBtn: NSButton!
+    private var isRecordingShortcut = false
+
     // Tracks which row is currently in listening mode
     private enum ListeningFor { case prev, next }
     private var listeningFor: ListeningFor?
 
     private init() {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 380, height: 210),
+            contentRect: NSRect(x: 0, y: 0, width: 380, height: 320),
             styleMask: [.titled, .closable, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
-        panel.title = "MacMouseEnhancer — Button Assignments"
+        panel.title = "MacMouseEnhancer — Settings"
         panel.isReleasedWhenClosed = false
         panel.level = .floating
         super.init(window: panel)
@@ -34,7 +38,7 @@ class SettingsWindowController: NSWindowController {
     private func buildUI() {
         guard let cv = window?.contentView else { return }
 
-        let header = label("Workspace Switching — Button Assignments", bold: true, size: 13)
+        let header = label("Workspace Switching", bold: true, size: 13)
         let sub    = label("Click Assign, then press a side mouse button to map it.\n(Left clicks are ignored during assignment.)", bold: false, size: 11, color: .secondaryLabelColor)
 
         let prevRow  = label("← Previous Workspace", bold: false, size: 12)
@@ -51,7 +55,17 @@ class SettingsWindowController: NSWindowController {
         )
         note.maximumNumberOfLines = 2
 
-        for v in [header, sub, prevRow, prevLabel!, prevAssignBtn!, nextRow, nextLabel!, nextAssignBtn!, note] as [NSView] {
+        // --- Scroll reversal shortcut section ---
+        let shortcutHeader = label("Scroll Reversal", bold: true, size: 13)
+        let shortcutSub = label("Click Record, then press a key combo (with at least one modifier)\nto set the toggle shortcut.", bold: false, size: 11, color: .secondaryLabelColor)
+        shortcutSub.maximumNumberOfLines = 2
+
+        let shortcutRow = label("Toggle Scroll Reversal", bold: false, size: 12)
+        shortcutLabel = label("", bold: false, size: 12, color: .secondaryLabelColor, mono: true)
+        shortcutAssignBtn = actionButton("Record", action: #selector(recordShortcutTapped))
+
+        for v in [header, sub, prevRow, prevLabel!, prevAssignBtn!, nextRow, nextLabel!, nextAssignBtn!, note,
+                  shortcutHeader, shortcutSub, shortcutRow, shortcutLabel!, shortcutAssignBtn!] as [NSView] {
             cv.addSubview(v)
         }
 
@@ -87,6 +101,24 @@ class SettingsWindowController: NSWindowController {
             note.topAnchor.constraint(equalTo: nextRow.bottomAnchor, constant: 18),
             note.leadingAnchor.constraint(equalTo: cv.leadingAnchor, constant: 20),
             note.trailingAnchor.constraint(equalTo: cv.trailingAnchor, constant: -20),
+
+            shortcutHeader.topAnchor.constraint(equalTo: note.bottomAnchor, constant: 20),
+            shortcutHeader.leadingAnchor.constraint(equalTo: cv.leadingAnchor, constant: 20),
+
+            shortcutSub.topAnchor.constraint(equalTo: shortcutHeader.bottomAnchor, constant: 4),
+            shortcutSub.leadingAnchor.constraint(equalTo: cv.leadingAnchor, constant: 20),
+            shortcutSub.trailingAnchor.constraint(equalTo: cv.trailingAnchor, constant: -20),
+
+            shortcutRow.topAnchor.constraint(equalTo: shortcutSub.bottomAnchor, constant: 16),
+            shortcutRow.leadingAnchor.constraint(equalTo: cv.leadingAnchor, constant: 20),
+            shortcutRow.widthAnchor.constraint(equalToConstant: 150),
+
+            shortcutLabel.centerYAnchor.constraint(equalTo: shortcutRow.centerYAnchor),
+            shortcutLabel.leadingAnchor.constraint(equalTo: shortcutRow.trailingAnchor, constant: 8),
+            shortcutLabel.widthAnchor.constraint(equalToConstant: 120),
+
+            shortcutAssignBtn.centerYAnchor.constraint(equalTo: shortcutRow.centerYAnchor),
+            shortcutAssignBtn.leadingAnchor.constraint(equalTo: shortcutLabel.trailingAnchor, constant: 8),
         ])
 
         refreshLabels()
@@ -170,6 +202,41 @@ class SettingsWindowController: NSWindowController {
         refreshLabels()
     }
 
+    // MARK: - Shortcut recording
+
+    @objc private func recordShortcutTapped() {
+        if isRecordingShortcut {
+            cancelShortcutRecording()
+        } else {
+            startShortcutRecording()
+        }
+    }
+
+    private func startShortcutRecording() {
+        isRecordingShortcut = true
+        shortcutAssignBtn.title = "Cancel"
+        shortcutLabel.stringValue = "Press keys…"
+        shortcutLabel.textColor = .systemOrange
+
+        EventTapManager.shared.shortcutListeningCallback = { [weak self] keyCode, mods in
+            guard let self else { return }
+            EventTapManager.shared.scrollReversalShortcutKeyCode = keyCode
+            EventTapManager.shared.scrollReversalShortcutModifiers = mods
+            self.isRecordingShortcut = false
+            self.shortcutAssignBtn.title = "Record"
+            self.refreshLabels()
+        }
+
+        EventTapManager.shared.restartTapIfNeeded()
+    }
+
+    private func cancelShortcutRecording() {
+        EventTapManager.shared.shortcutListeningCallback = nil
+        isRecordingShortcut = false
+        shortcutAssignBtn.title = "Record"
+        refreshLabels()
+    }
+
     private func refreshLabels() {
         if listeningFor != .prev {
             prevLabel.stringValue = "Button \(EventTapManager.shared.prevButton)"
@@ -178,6 +245,13 @@ class SettingsWindowController: NSWindowController {
         if listeningFor != .next {
             nextLabel.stringValue = "Button \(EventTapManager.shared.nextButton)"
             nextLabel.textColor = .secondaryLabelColor
+        }
+        if !isRecordingShortcut {
+            shortcutLabel.stringValue = EventTapManager.describeShortcut(
+                keyCode: EventTapManager.shared.scrollReversalShortcutKeyCode,
+                modifiers: EventTapManager.shared.scrollReversalShortcutModifiers
+            )
+            shortcutLabel.textColor = .secondaryLabelColor
         }
     }
 }

@@ -4,8 +4,10 @@ A lightweight macOS menu bar app that maps mouse side buttons to workspace switc
 
 ## Features
 
-- **Side button workspace switching** — back/forward mouse buttons switch between Mission Control spaces with the native slide animation
+- **Side button workspace switching** — back/forward mouse buttons switch between Mission Control spaces with the native slide animation, on all monitors
 - **Scroll reversal** — flips scroll direction on all axes (natural scrolling toggle)
+- **Scroll speed multiplier** — when reversal is on, boosts slow-wheel scrolling to counteract macOS's scroll acceleration dampening (Slow 1× / Normal 2× / Fast 3× / Very Fast 5×)
+- **Toggle shortcut** — a recordable keyboard shortcut to enable/disable scroll reversal (default **⌃⌘⇧S**)
 - **Configurable button assignments** — assign any mouse button to prev/next workspace via the settings panel
 
 ## Requirements
@@ -41,10 +43,17 @@ A lightweight macOS menu bar app that maps mouse side buttons to workspace switc
 Click the mouse icon in the menu bar to access controls:
 
 - **Workspace Switch: ON/OFF** — toggle side button switching
-- **Button Assignments…** — click Assign, then press any mouse button to remap prev/next workspace
 - **Scroll Reversal: ON/OFF** — toggle scroll direction reversal
+- **Scroll Speed** — (shown when reversal is on) pick the scroll multiplier
+- **Toggle Shortcut** — shows the current keyboard shortcut for toggling scroll reversal
+- **Settings…** — open the settings panel to assign workspace buttons and record the toggle shortcut
 - **Accessibility Permissions…** — open the relevant System Settings pane
 - **Quit**
+
+In **Settings…** you can:
+
+- **Workspace Switching** — click Assign, then press any mouse button to remap prev/next workspace (left clicks are ignored during assignment)
+- **Scroll Reversal** — click Record, then press a key combo (with at least one modifier) to set the scroll-reversal toggle shortcut
 
 ## How it works
 

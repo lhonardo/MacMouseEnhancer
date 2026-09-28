@@ -21,8 +21,27 @@ class EventTapManager {
         didSet { savePreferences() }
     }
 
+    // Keyboard shortcut to toggle scroll reversal.
+    // Default: Ctrl+Cmd+Shift+S  (keyCode 1 = 's')
+    var scrollReversalShortcutKeyCode: Int = 1 {
+        didSet { savePreferences() }
+    }
+    var scrollReversalShortcutModifiers: UInt64 =
+        CGEventFlags.maskControl.rawValue |
+        CGEventFlags.maskCommand.rawValue |
+        CGEventFlags.maskShift.rawValue {
+        didSet { savePreferences() }
+    }
+
     // Set to capture the next button press for binding. Cleared after one use.
     var buttonListeningCallback: ((Int) -> Void)?
+
+    // Set to capture the next key combo for the shortcut. Cleared after one use.
+    // Delivers (keyCode, modifierFlags).
+    var shortcutListeningCallback: ((Int, UInt64) -> Void)?
+
+    // Notified when the scroll-reversal state changes (so the menu can refresh).
+    var scrollReversalDidToggle: (() -> Void)?
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -40,6 +59,8 @@ class EventTapManager {
         if d.object(forKey: "scrollSpeedMultiplier") != nil  { scrollSpeedMultiplier  = d.double(forKey: "scrollSpeedMultiplier") }
         if d.object(forKey: "prevWorkspaceButton") != nil  { prevButton = d.integer(forKey: "prevWorkspaceButton") }
         if d.object(forKey: "nextWorkspaceButton") != nil  { nextButton = d.integer(forKey: "nextWorkspaceButton") }
+        if d.object(forKey: "scrollReversalShortcutKeyCode") != nil   { scrollReversalShortcutKeyCode   = d.integer(forKey: "scrollReversalShortcutKeyCode") }
+        if d.object(forKey: "scrollReversalShortcutModifiers") != nil { scrollReversalShortcutModifiers = UInt64(bitPattern: Int64(d.integer(forKey: "scrollReversalShortcutModifiers"))) }
     }
 
     private func savePreferences() {
@@ -49,6 +70,8 @@ class EventTapManager {
         d.set(scrollSpeedMultiplier,  forKey: "scrollSpeedMultiplier")
         d.set(prevButton, forKey: "prevWorkspaceButton")
         d.set(nextButton, forKey: "nextWorkspaceButton")
+        d.set(scrollReversalShortcutKeyCode, forKey: "scrollReversalShortcutKeyCode")
+        d.set(Int(bitPattern: UInt(scrollReversalShortcutModifiers)), forKey: "scrollReversalShortcutModifiers")
     }
 
     // MARK: - Tap lifecycle
@@ -73,7 +96,8 @@ class EventTapManager {
             (1 << CGEventType.otherMouseUp.rawValue)   |
             (1 << CGEventType.leftMouseDown.rawValue)  |
             (1 << CGEventType.rightMouseDown.rawValue) |
-            (1 << CGEventType.scrollWheel.rawValue)
+            (1 << CGEventType.scrollWheel.rawValue)     |
+            (1 << CGEventType.keyDown.rawValue)
 
         let selfPtr = Unmanaged.passRetained(self).toOpaque()
 
@@ -123,9 +147,44 @@ class EventTapManager {
             guard scrollReversalEnabled else { return Unmanaged.passRetained(event) }
             return reverseScroll(event)
 
+        case .keyDown:
+            return handleKeyDown(event: event)
+
         default:
             return Unmanaged.passRetained(event)
         }
+    }
+
+    // MARK: - Keyboard shortcut
+
+    // Only these modifier bits are significant when comparing/recording a shortcut.
+    private let relevantModifierMask: UInt64 =
+        CGEventFlags.maskControl.rawValue |
+        CGEventFlags.maskAlternate.rawValue |
+        CGEventFlags.maskShift.rawValue |
+        CGEventFlags.maskCommand.rawValue
+
+    private func handleKeyDown(event: CGEvent) -> Unmanaged<CGEvent>? {
+        let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
+        let mods = event.flags.rawValue & relevantModifierMask
+
+        // Recording mode: capture the combo (requires at least one modifier).
+        if let callback = shortcutListeningCallback {
+            if mods == 0 { return Unmanaged.passRetained(event) }  // ignore bare keys
+            shortcutListeningCallback = nil
+            DispatchQueue.main.async { callback(keyCode, mods) }
+            return nil
+        }
+
+        // Match the recorded scroll-reversal toggle shortcut.
+        if keyCode == scrollReversalShortcutKeyCode,
+           mods == (scrollReversalShortcutModifiers & relevantModifierMask) {
+            scrollReversalEnabled.toggle()
+            DispatchQueue.main.async { [weak self] in self?.scrollReversalDidToggle?() }
+            return nil
+        }
+
+        return Unmanaged.passRetained(event)
     }
 
     // MARK: - Mouse button down
@@ -241,5 +300,33 @@ class EventTapManager {
         event.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: -p2 * m)
 
         return Unmanaged.passRetained(event)
+    }
+
+    // MARK: - Shortcut display
+
+    // Human-readable representation of a shortcut, e.g. "⌃⌘⇧S".
+    static func describeShortcut(keyCode: Int, modifiers: UInt64) -> String {
+        var s = ""
+        if modifiers & CGEventFlags.maskControl.rawValue   != 0 { s += "⌃" }
+        if modifiers & CGEventFlags.maskAlternate.rawValue != 0 { s += "⌥" }
+        if modifiers & CGEventFlags.maskShift.rawValue     != 0 { s += "⇧" }
+        if modifiers & CGEventFlags.maskCommand.rawValue   != 0 { s += "⌘" }
+        s += keyName(for: keyCode)
+        return s
+    }
+
+    // Maps a virtual key code to a display name.
+    private static func keyName(for keyCode: Int) -> String {
+        let map: [Int: String] = [
+            0: "A", 1: "S", 2: "D", 3: "F", 4: "H", 5: "G", 6: "Z", 7: "X",
+            8: "C", 9: "V", 11: "B", 12: "Q", 13: "W", 14: "E", 15: "R",
+            16: "Y", 17: "T", 18: "1", 19: "2", 20: "3", 21: "4", 22: "6",
+            23: "5", 24: "=", 25: "9", 26: "7", 27: "-", 28: "8", 29: "0",
+            30: "]", 31: "O", 32: "U", 33: "[", 34: "I", 35: "P", 36: "↩",
+            37: "L", 38: "J", 39: "'", 40: "K", 41: ";", 42: "\\", 43: ",",
+            44: "/", 45: "N", 46: "M", 47: ".", 48: "⇥", 49: "Space", 50: "`",
+            51: "⌫", 53: "⎋", 123: "←", 124: "→", 125: "↓", 126: "↑",
+        ]
+        return map[keyCode] ?? "Key \(keyCode)"
     }
 }
